@@ -66,7 +66,16 @@ public class SeckillServiceImpl implements SeckillService {
 
     @Override
     public Seckill findById(long seckillId) {
-        return seckillMapper.findById(seckillId);
+        Seckill seckill = (Seckill) redisTemplate.boundHashOps(key).get(seckillId);
+        if (seckill==null){
+            seckill = seckillMapper.findById(seckillId);
+            if (seckill != null) {
+                //查询到了，存入redis缓存中。 key:秒杀表的ID值； value:秒杀表数据
+                redisTemplate.boundHashOps(key).put(seckill.getSeckillId(), seckill);
+                logger.info("RedisTemplate -> 从数据库中读取并放入缓存中");
+            }
+        }
+        return seckill;
     }
 
     @Override
@@ -144,7 +153,7 @@ public class SeckillServiceImpl implements SeckillService {
 
                     //更新缓存（更新库存数量）
                     Seckill seckill = (Seckill) redisTemplate.boundHashOps(key).get(seckillId);
-                    seckill.setStockCount(seckill.getSeckillId() - 1);
+                    seckill.setStockCount(seckill.getStockCount() - 1);
                     redisTemplate.boundHashOps(key).put(seckillId, seckill);
 
                     return new SeckillExecution(seckillId, SeckillStatEnum.SUCCESS, seckillOrder);
